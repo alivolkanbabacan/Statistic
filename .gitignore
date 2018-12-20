@@ -225,3 +225,13 @@ pickle-email-*.html
 
 # Ignore node_modules
 node_modules/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Intellij
+.idea/
+*.iml
+*.iws
