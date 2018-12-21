@@ -23,15 +23,18 @@ import net.jodah.expiringmap.ExpiringMap;
 public class TransactionServiceImpl implements TransactionService {
 	private final ExpiringMap<Transaction, Instant> transactionCache;
 	private int cacheTimeInMilliSeconds;
+	private Statistic statistic;
 
 	@Autowired
 	public TransactionServiceImpl(@Value("${cache.time.in.milliseconds}") int cacheTimeInMilliSeconds) {
 		this.cacheTimeInMilliSeconds = cacheTimeInMilliSeconds;
-		this.transactionCache = ExpiringMap.builder().variableExpiration().build();
+		this.statistic = new Statistic();
+		this.transactionCache = ExpiringMap.builder().variableExpiration()
+				.expirationListener((key, value) -> removedTransactionListener((Transaction) key)).build();
 	}
 
 	@Override
-	public void saveTransaction(Transaction transaction) {
+	public synchronized void saveTransaction(Transaction transaction) {
 		if (!isTransactionValid(transaction)) {
 			throw new OutDatedTransactionException(transaction);
 		}
@@ -39,20 +42,19 @@ public class TransactionServiceImpl implements TransactionService {
 		transactionCache.put(transaction, transaction.getTimestamp(), ExpirationPolicy.CREATED,
 				getExpireDateOfTransaction(transaction), TimeUnit.MILLISECONDS);
 
+		statistic.addTransaction(transaction);
 	}
 
 	@Override
 	public Statistic getStatistic() {
-		Statistic statistic = new Statistic();
-
-		transactionCache.keySet().stream().forEach(e -> statistic.addTransaction(e));
-
 		return statistic;
 	}
 
 	@Override
-	public void deleteTransactions() {
+	public synchronized void deleteTransactions() {
 		transactionCache.clear();
+
+		statistic = new Statistic();
 	}
 
 	private boolean isTransactionValid(Transaction transaction) {
@@ -68,5 +70,13 @@ public class TransactionServiceImpl implements TransactionService {
 		long milliSeconds = ChronoUnit.MILLIS.between(transaction.getTimestamp(), Instant.now());
 
 		return cacheTimeInMilliSeconds - milliSeconds;
+	}
+
+	/**
+	 * Triggered when a transaction has expired and removed from transaction
+	 * cache. Updates the Statistic.
+	 */
+	private synchronized void removedTransactionListener(Transaction transaction) {
+		statistic.substractTransaction(transaction, transactionCache);
 	}
 }
