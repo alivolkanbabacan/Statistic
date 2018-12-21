@@ -48,7 +48,6 @@ public class TransactionController {
 	@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseStatus(HttpStatus.CREATED)
 	public void saveTransaction(@RequestBody @Valid Transaction transaction) {
-		log.info("Saving transaction: " + transaction);
 		transactionService.saveTransaction(transaction);
 	}
 
