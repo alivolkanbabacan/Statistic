@@ -20,7 +20,7 @@ A Java RESTful API for calculating realtime statistics for the last 60 seconds o
 
 ### Design Notes
 * Valid transactions ( Transactions that has a timestamp value within the last minute for the time zone UTC ) are put into a
-thread-safe net.jodah.expiringmap. Their expiring times are given individually by calculating how much time has left for the transaction to expire by looking at their timestamp values. Statistic is also updated. Saving a transaction takes O(1) time. The transaction whose expiring time has passed is automatically removed from the map. After removal, an event is triggered and the removed transaction's values are extracted from the Statistic. If the removed transaction's amount is not the maximum or the minimum amount among other transactions in the map, then this update operation also takes O(1) time without traversing the map.
+thread-safe net.jodah.expiringmap. Their expiring times are given individually by calculating how much time has left for the transaction to expire by looking at their timestamp values. Statistic is also updated. Saving a transaction takes O(1) time. The transaction whose expiring time has passed is automatically removed from the map. After removal, an event is triggered and the removed transaction's values are extracted from the Statistic. If the removed transaction's amount is not the maximum or the minimum amount among other transactions in the map, then this update operation takes O(1) time without traversing the map.
 
 * When getting a statistic for the last minute, the already calculated Statistic is returned, thus taking O(1) time.
 
