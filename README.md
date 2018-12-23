@@ -24,8 +24,6 @@ thread-safe net.jodah.expiringmap. Their expiring times are given individually b
 
 * When getting a statistic for the last minute, the already calculated Statistic is returned, thus taking O(1) time.
 
-* By default, statistics are calculated for the last minute. But this can be changed through changing the 'cache.time.in.milliseconds' property in application.properties file.  
-
 
 ### Available Services
 

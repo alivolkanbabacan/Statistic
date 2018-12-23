@@ -3,6 +3,9 @@ package com.n26.service.impl;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.Lock;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +28,10 @@ public class TransactionServiceImpl implements TransactionService {
 	private int cacheTimeInMilliSeconds;
 	private Statistic statistic;
 
+	private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+	private final Lock readLock = readWriteLock.readLock();
+	private final Lock writeLock = readWriteLock.writeLock();
+
 	@Autowired
 	public TransactionServiceImpl(@Value("${cache.time.in.milliseconds}") int cacheTimeInMilliSeconds) {
 		this.cacheTimeInMilliSeconds = cacheTimeInMilliSeconds;
@@ -34,27 +41,42 @@ public class TransactionServiceImpl implements TransactionService {
 	}
 
 	@Override
-	public synchronized void saveTransaction(Transaction transaction) {
+	public void saveTransaction(Transaction transaction) {
 		if (!isTransactionValid(transaction)) {
 			throw new OutDatedTransactionException(transaction);
 		}
 
-		transactionCache.put(transaction, transaction.getTimestamp(), ExpirationPolicy.CREATED,
-				getExpireDateOfTransaction(transaction), TimeUnit.MILLISECONDS);
+		writeLock.lock();
+		try {
+			transactionCache.put(transaction, transaction.getTimestamp(), ExpirationPolicy.CREATED,
+					getExpireDateOfTransaction(transaction), TimeUnit.MILLISECONDS);
 
-		statistic.addTransaction(transaction);
+			statistic.addTransaction(transaction);
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	@Override
 	public Statistic getStatistic() {
-		return statistic;
+		readLock.lock();
+		try {
+			return statistic;
+		} finally {
+			readLock.unlock();
+		}
 	}
 
 	@Override
-	public synchronized void deleteTransactions() {
-		transactionCache.clear();
+	public void deleteTransactions() {
+		writeLock.lock();
+		try {
+			transactionCache.clear();
 
-		statistic = new Statistic();
+			statistic = new Statistic();
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	private boolean isTransactionValid(Transaction transaction) {
@@ -76,7 +98,12 @@ public class TransactionServiceImpl implements TransactionService {
 	 * Triggered when a transaction has expired and removed from transaction
 	 * cache. Updates the Statistic.
 	 */
-	private synchronized void removedTransactionListener(Transaction transaction) {
-		statistic.substractTransaction(transaction, transactionCache);
+	private void removedTransactionListener(Transaction transaction) {
+		writeLock.lock();
+		try {
+			statistic.substractTransaction(transaction, transactionCache);
+		} finally {
+			writeLock.unlock();
+		}
 	}
 }
